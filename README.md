@@ -2,6 +2,8 @@
 
 一個可以拆開看的 3D 互動模擬器：用木頭做的三軸式 5 速手排變速箱。單一離線 HTML 頁面，用 Three.js 繪製，不需要後端。
 
+![木製 5 速手排變速箱 3D 預覽](preview.png)
+
 **線上體驗：<https://tonnychiulab.github.io/wooden-gearbox/>**
 
 ## 你可以做什麼

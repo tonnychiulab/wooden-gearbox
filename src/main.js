@@ -127,7 +127,7 @@ canvas.id = 'gl';
 app.appendChild(canvas);
 const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance'});
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(BG);
@@ -281,7 +281,7 @@ const LABELS = [
   {t: `中間軸 ${ZC0}T`, p: [0, CS_Y - 82, 0]},
   {t: '輸出軸 · 接傳動軸', p: [0, 24, 488]},
   ...GEARS.map((g) => ({t: `${g.n}檔 ${g.zm}T/${g.zc}T`, p: [0, (M * g.zm) / 2 + 14, g.z]})),
-  {t: '撥叉 + 滑動套筒', p: [0, 112, 120]},
+  {t: '撥叉 + 滑動套筒', p: [0, 150, 120]},
 ];
 const lblLayer = document.createElement('div');
 lblLayer.className = 'lbls';
@@ -297,7 +297,7 @@ const lblEls = LABELS.map((l) => {
 const ui = document.createElement('div');
 ui.className = 'ui';
 ui.innerHTML = `
-<div class="hdr"><b>木製 5 速手排變速箱</b><span>模數 ${M} mm · 中心距 ${(M * 60) / 2} mm · 慢動作 1/${1 / SLOW}×</span></div>
+<div class="gb-hdr"><b>木製 5 速手排變速箱</b><span>模數 ${M} mm · 中心距 ${(M * 60) / 2} mm · 慢動作 1/${1 / SLOW}×</span></div>
 <div class="chip" id="chip"></div>
 <div class="panel gauges">
   <div class="gear" id="gGear">N</div>
@@ -309,7 +309,7 @@ ui.innerHTML = `
   <canvas id="chart" width="320" height="170"></canvas>
   <div class="note">各檔車速 vs 引擎轉速;點為目前狀態</div>
 </div>
-<div class="cap" id="cap"></div>
+<div class="gb-cap" id="cap"></div>
 <div class="bar">
   <div class="grp" id="gears"></div>
   <div class="grp sl"><label>引擎轉速</label><input id="rpm" type="range" min="700" max="6000" step="10" value="1200"><b id="rpmV">1200</b></div>
@@ -332,7 +332,7 @@ addBtn('gears', 'g0', 'N', '空檔 (0)');
 for (const g of GEARS) addBtn('gears', `g${g.n}`, `${g.n}`, `${g.n} 檔 (${g.n})`);
 const VIEWS = {
   hero: {az: 38, el: 24, d: 960, t: [0, -60, 215], label: '全景', key: 'q'},
-  side: {az: 90, el: 4, d: 1000, t: [0, -50, 215], label: '側視', key: 'w'},
+  side: {az: 90, el: 4, d: 1000, t: [0, -50, 140], label: '側視', key: 'w'},
   top: {az: 0, el: 84, d: 940, t: [0, -60, 215], label: '俯視', key: 'e'},
   end: {az: -28, el: 10, d: 760, t: [0, -50, 110], label: '端視', key: 'r'},
 };
@@ -508,10 +508,11 @@ function runTour() {
 }
 
 // ------------------------------------------------------------------ resize
+let PR_MAX = 2;
 const resize = () => {
   const w = innerWidth;
   const h = innerHeight;
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, PR_MAX));
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.fov = w / h < 1.3 ? 44 : 30;
@@ -574,11 +575,30 @@ const setHl = (mats, v) => {
 const pv = new THREE.Vector3();
 let last = performance.now();
 let frameN = 0;
+const perf = {age: 0, sum: 0, n: 0, done: false};
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
   S.T += dt;
   frameN++;
+  // a slow GPU (an integrated one, a software renderer): after 3 s of measuring, drop the pixel ratio and the shadow map once
+  if (!perf.done) {
+    perf.age += dt;
+    if (perf.age > 1) {
+      perf.sum += dt;
+      perf.n++;
+    }
+    if (perf.age > 4) {
+      perf.done = true;
+      if (perf.sum / perf.n > 0.035) {
+        PR_MAX = 1;
+        sun.shadow.mapSize.set(1024, 1024);
+        sun.shadow.map?.dispose();
+        sun.shadow.map = null;
+        resize();
+      }
+    }
+  }
   if (tour) runTour();
   else if (S.T - lastInput > 25) {
     tour = true;
